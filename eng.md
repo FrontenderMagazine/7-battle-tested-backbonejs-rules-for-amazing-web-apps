@@ -22,6 +22,8 @@ inside a view (or worse: the DOM), stop and move it into the model.
 
 If you don’t have a model, create one, it’s easy:
 
+    this.viewState = new Backbone.Model();
+
 It really doesn’t have to be any fancier than that.
 
 You can now listen to change events on all your data or even easily sync it
@@ -38,6 +40,8 @@ Changing the DOM without changing a state means you keep your state on the DOM
 If a click on a “read more” link was made, don’t expand the view, just
 change the model:
 
+    this.viewState.set('readMore', true);
+
 Ok, but how will the view actually change? Good question, the next rule answers
 that.
 
@@ -46,7 +50,11 @@ that.
 Events are awesome - use them. The easiest approach is to render again after
 each change:
 
+    this.listenTo(this.stateModel, 'change', this.render);
+
 A much better approach is to only change what’s needed:
+
+    this.listenTo(this.stateModel, 'change:readMore', this.renderReadMore);
 
 The view is always synced with the model. It doesn’t matter how the model was
 changed: following an action, from a fetch or from a console debugging session
@@ -65,10 +73,18 @@ That's where \`listenTo\` comes in. It tracks what the view is bound to and
 unbinds it on a remove. Backbone does this by calling \`stopListening\` just 
 before removing itself from the DOM:
 
+    // Ok:
+    this.stateModel.on('change:readMore', this.renderReadMore, this);
+
+    // Awesome:
+    this.listenTo(this.stateModel, 'change:readMore', this.renderReadMore);
+
 ## 5. Always be chainable
 
 Always return \`this\` from the \`render\` and \`remove\` functions. This
 allows you to chain actions:
+
+    view.render().$el.appendTo(otherElement);
 
 This is the convention, do not break it.
 
@@ -79,7 +95,16 @@ It's better to react upon events than waiting for callbacks.
 Backbone models fire 'sync' and 'error' events by default so we can use these
 events instead of providing callbacks. Consider these two alternatives:
 
+    model.fetch({
+        success: handleSuccess,
+        error: handleError
+    });
+
 This is much better:
+
+    view.listenTo(model, 'sync', handleSuccess);
+    view.listenTo(model, 'error', handleError);
+    model.fetch();
 
 It doesn't matter how or where a model will be fetched, the handleSuccess/
 handleError methods will be called.
@@ -94,12 +119,34 @@ element '$el
 
 This means you must never use jQuery directly:
 
+    $('.text').html('Thank you');
+
 Always scope yourself to your own DOM element instead:
+
+    this.$('.text').html('Thank you');
+ 
+    // psssst... This is the same as:
+    // this.$el.find('.text').html('Thank you');
 
 If you need to alter a different view, just trigger an event and let the other
 view do its thing. You can also use Backbone as a global Pub/Sub system.
 
 For example, let's prevent the page from scrolling:
+
+    var BodyView = Backbone.View.extend({
+        initialize: function() {
+            this.listenTo(Backbone, 'prevent-scroll', this.preventScroll);
+        },
+ 
+        preventScroll: function(prevent) {
+            // .prevent-scroll has the following CSS rule: overflow: hidden;
+            this.$el.toggleClass('prevent-scroll', prevent);
+        }
+    });
+ 
+    // And now from anywhere in the code:
+    Backbone.trigger('prevent-scroll', true); // prevent scrolling
+    Backbone.trigger('prevent-scroll', false); // allow scrolling
 
 ## One more thing
 
